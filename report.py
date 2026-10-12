@@ -30,9 +30,9 @@ table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}th,td{tex
 .blocker,.unresolved,.failed,.unanswered{color:var(--red)}.high{color:var(--orange)}.medium,.defer{color:var(--amber)}.low,.reject{color:var(--grey)}.accept,.resolved,.ok{color:var(--green)}.running{color:var(--accent)}
 .state{font-weight:600}.headline{font-size:19px;font-weight:600;margin:6px 0 10px}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:14px 0}.tile{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
-.tile .v{font-size:20px;font-weight:650;line-height:1.25}.tile .l{font-size:12.5px;color:var(--muted)}
+.tile .v{font-size:18px;font-weight:650;line-height:1.25;overflow-wrap:anywhere}.tile .l{font-size:12.5px;color:var(--muted)}
 figure{margin:16px 0;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;overflow-x:auto}figcaption{font-weight:600;margin-bottom:8px}
-figure .cap{color:var(--muted);font-size:13.5px;margin-top:8px}.diagram svg{max-width:100%;height:auto}pre.diagram{white-space:pre-wrap}
+figure .cap{color:var(--muted);font-size:13.5px;margin-top:8px}.diagram svg{height:auto;min-width:min(100%,640px)}.diagram{overflow-x:auto}pre.diagram{white-space:pre-wrap}
 .steps{list-style:none;padding:0;margin:12px 0;counter-reset:s}.steps li{counter-increment:s;position:relative;padding:0 0 14px 44px;border-left:2px solid var(--line);margin-left:14px}
 .steps li:last-child{border-left-color:transparent}.steps li:before{content:counter(s);position:absolute;left:-15px;top:-2px;width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--bg);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center}
 .steps b{display:block}.steps .dw{color:var(--muted);font-size:13.5px}.finding{border-left:3px solid var(--line);padding:2px 0 2px 10px;margin:10px 0}.finding p{margin:3px 0}

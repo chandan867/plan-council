@@ -14,6 +14,7 @@ Run `COUNCIL detect`. It prints JSON:
 - `clis`: the agent CLIs installed on this machine and the models each can run.
 - `config`: the saved lineup, or `null` if there is none yet.
 - `suggested`: a lineup built from what is installed.
+- `notes`: warnings about the suggestion, for example that only one model is known. Act on them in step 2.
 
 If `config` is not null and the user has not asked to change models, say the lineup in one line and go to step 3.
 

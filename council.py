@@ -37,6 +37,8 @@ FAMILIES = (
     ("glm", r"glm"), ("qwen", r"qwen"), ("deepseek", r"deepseek"), ("kimi", r"kimi|moonshot"), ("llama", r"llama"),
     ("mistral", r"mistral|codestral|devstral"),
 )
+STRONG_NAMES = r"opus|fable|sonnet|astra|\bsol\b|pro\b|max\b|ultra|large"
+WEAK_NAMES = r"free|mini|nano|lite|flash|haiku|luna|small|tiny|fast|instant|preview|auto-review"
 HARNESS_FAMILY = {"claude": "claude", "codex": "gpt"}  # vendor when a CLI runs its default model
 SKILL_DIRS = {"claude": "~/.claude/skills", "codex": "~/.codex/skills", "opencode": "~/.config/opencode/skills", "pi": "~/.pi/agent/skills"}
 _active_run = []  # the run being executed, so main() can record its exit code
@@ -117,6 +119,13 @@ def family(harness, model):
     return None if model else HARNESS_FAMILY.get(harness)
 
 
+def strength(model):
+    """Rough rank of a model from its name, so a suggested lineup does not lead with a small or free one."""
+    name = model.lower()
+    versions = [float(v) for v in re.findall(r"\d+(?:\.\d+)?", name)]
+    return (2 if re.search(STRONG_NAMES, name) else 0) - (3 if re.search(WEAK_NAMES, name) else 0) + min(versions[:1] or [0], default=0) / 100
+
+
 def _lines(cmd):
     try:
         return subprocess.run(cmd, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=30).stdout.splitlines()
@@ -136,9 +145,16 @@ def list_models(harness):
         return [found.group(1)] if found else []
     if harness == "pi":
         rows = [l.split() for l in _lines(["pi", "--list-models"])]
-        return ["%s/%s" % (r[0], r[1]) for r in rows if len(r) > 1 and r[0] != "provider"]
+        return sorted(("%s/%s" % (r[0], r[1]) for r in rows if len(r) > 1 and r[0] != "provider"), key=strength, reverse=True)
     if harness == "opencode":
-        return [l.strip() for l in _lines(["opencode", "models"]) if re.match(r"^\S+/\S+$", l.strip())]
+        models = sorted((l.strip() for l in _lines(["opencode", "models"]) if re.match(r"^\S+/\S+$", l.strip())), key=strength, reverse=True)
+        try:  # the model the user already set as their default goes first; read only that one key
+            chosen = re.search(r'^\s*"model"\s*:\s*"([^"]+)"', read(os.path.expanduser("~/.config/opencode/opencode.json")), re.M)
+        except OSError:
+            chosen = None
+        if chosen and chosen.group(1) in models:
+            models.insert(0, models.pop(models.index(chosen.group(1))))
+        return models
     return []
 
 
@@ -918,8 +934,20 @@ def cmd_detect(args):
     if path:
         cfg = load_config(args.config, cwd)
         current = {"path": path, "planner": cfg["planner"], "critics": cfg["critics"], "verifier": cfg["verifier"]}
+    suggested = suggest(inv)
+    notes = []
+    if suggested:
+        labels = {role_label(r) for r in suggested["critics"].values()} | {role_label(suggested["planner"])}
+        vendors = {family(r["harness"], r["model"]) for r in list(suggested["critics"].values()) + [suggested["planner"]]}
+        if len(labels) == 1:
+            notes.append("Only one model is known, so planner and critics would be the same model. Ask the user which other "
+                         "models their CLI can run and pass them to `configure`, or to install a second CLI.")
+        elif len(vendors) == 1:
+            notes.append("All suggested models are from one vendor. It works, but models from different vendors catch more.")
+    if "codex" in inv:
+        notes.append("codex cannot list its models; only its default is shown. Other model names can be typed in.")
     say(json.dumps({"clis": inv, "not_installed": [h for h in HARNESSES if h not in inv], "config": current,
-                    "suggested": suggest(inv)}, indent=2))
+                    "suggested": suggested, "notes": notes}, indent=2))
     return 0 if inv else 1
 
 

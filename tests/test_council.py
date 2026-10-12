@@ -190,6 +190,12 @@ class Setup(unittest.TestCase):
         self.assertEqual(got["critics"], {"gpt": {"harness": "codex", "model": None}})
         self.assertIsNone(council.suggest({}))
 
+    def test_small_and_free_models_rank_below_large_ones(self):
+        names = ["x/big-pickle-free", "x/claude-haiku-4-5", "x/gpt-6-astra", "x/deepseek-v4-pro", "x/gemini-3-flash"]
+        ranked = sorted(names, key=council.strength, reverse=True)
+        self.assertEqual(set(ranked[:2]), {"x/gpt-6-astra", "x/deepseek-v4-pro"})
+        self.assertEqual(ranked[-1], "x/big-pickle-free")
+
     def test_configure_writes_a_config_that_loads(self):
         with tempfile.TemporaryDirectory() as cwd, redirect_stdout(io.StringIO()):
             code = council.main(["configure", "--local", "--cwd", cwd, "--planner", "claude:opus",
