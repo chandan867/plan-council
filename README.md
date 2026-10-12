@@ -90,6 +90,8 @@ Exit code: `0` ready, `3` something needs you, `1` the run failed.
 council view            # opens report.html for the latest run in this project
 ```
 
+Every run, detached or foreground, prints a `watch` line with its live `report.html` at the start. Open it in a browser to follow the run model by model while it works.
+
 The report opens with the plan at a glance: a headline, the key figures, diagrams of the design or flow, the steps in order, the key decisions and the main risks. Diagrams are drawn in the browser with Mermaid, loaded from a CDN; offline you see the diagram source instead.
 
 Below that it shows each step in order with the CLI and model that did it and how long it took: how each model framed the goal, the brief and your answers, every competing draft, the judge's scores and chosen base, each critic's findings lens by lens, what the planner decided for every finding and why, the verifier's check, and the final plan. Each step links to the exact prompt sent and the raw reply. It is rebuilt after every model call and refreshes by itself while a run is going, so you can leave it open from the start.

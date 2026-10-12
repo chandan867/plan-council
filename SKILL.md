@@ -71,7 +71,7 @@ COUNCIL frame --detach --context .council/intake.md "the goal in the user's word
 COUNCIL status --wait 100
 ```
 
-The first command prints a `watch` line with the path of `report.html`. Give that path to the user straight away: opened in a browser, it shows every step as it finishes, model by model (each framing, each draft, the judge's scores, each critic's findings, what the planner decided and what the verifier said). It refreshes by itself while the run is going. `COUNCIL view` opens it for them.
+The first command prints a `watch` line with the path of `report.html`. By default, open it straight away with `COUNCIL view` so you observe the run live, and give that path to the user too: opened in a browser, it shows every step as it finishes, model by model (each framing, each draft, the judge's scores, each critic's findings, what the planner decided and what the verifier said). It refreshes by itself while the run is going.
 
 Repeat `status` until its `state` line says `done` or `failed`. Up to three models read the project independently and the planner merges their framings into `brief.md` in the run folder.
 
@@ -102,13 +102,16 @@ Options:
 - `--depth quick` (default) or `--depth full` for more lenses, when the task is large or risky or the user asks for thorough.
 - `--arena`: several models each draft the plan, a judge from another vendor compares them and the planner combines the best parts. On by default after `frame` and at full depth. Use `--no-arena` to save time.
 
-Follow it the same way:
+Follow it the same way. By default, open the live report first so you observe it while it runs:
 
 ```
+COUNCIL view
 COUNCIL status --wait 100
 ```
 
 A quick run takes around ten minutes, a framed or full run longer. Keep `--wait` below your own command timeout; 100 seconds is safe everywhere. Between polls, tell the user in a few words which stage it is on.
+
+Without `--detach` the run stays in the foreground, but it prints the same `watch` line at the start — open that `report.html` in a browser (or run `COUNCIL view` from another shell) to observe it live.
 
 If a command fails because of a sandbox, a blocked network, or a CLI that is not logged in: the council starts other agent CLIs, which need network access and their own login. Ask the user to allow the command or to log in to that CLI. Do not work around it.
 
@@ -116,7 +119,7 @@ If a command fails because of a sandbox, a blocked network, or a CLI that is not
 
 The last lines of `status` give the run folder and the files in it.
 
-0. Give the user the `report` path from `status` (or run `COUNCIL view` to open it). It is the full record, from the first framing to the final plan, with which model said what.
+0. The `report` path from `status` is the full record, from the first framing to the final plan, with which model said what. It should already be open in your browser from step 5/6 (`COUNCIL view`); if not, run `COUNCIL view` to open it now.
 1. If `NEEDS-YOU.md` exists, read it first. For each item give the user the finding, the planner's answer and why they disagree, and ask for a decision. These are the only points where the models could not agree.
 2. Read `summary.json` (and `plan.md` for detail) and present the plan visually, not as a wall of text: the headline, the key figures as a small table, the steps in order, the key decisions and the main risks. Show each diagram as a `mermaid` code block if your interface draws them; either way, tell the user the report shows them drawn at the top, under "The plan at a glance".
 3. Say in one or two lines what the council did, from `arena.md` and `ledger.md`: which candidate became the base, how many findings were raised and how many were accepted.

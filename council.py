@@ -644,9 +644,15 @@ def detach(run, args):
         proc = subprocess.Popen(child, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
     write(run.path("pid"), str(proc.pid))
     say("started   " + run.dir)
-    say("watch     %s  (open in a browser; it updates as each model finishes)" % (report.write(run.dir) or run.path("report.html")))
+    watch(run)
     say("follow    council status --wait 100 --cwd " + run.cwd)
     return 0
+
+
+def watch(run):
+    """Print the live report path so the operator can watch the run in a browser, detached or not."""
+    os.makedirs(run.dir, exist_ok=True)
+    say("watch     %s  (open in a browser; it updates as each model finishes)" % (report.write(run.dir) or run.path("report.html")))
 
 
 def start(run):
@@ -711,6 +717,7 @@ def cmd_frame(args):
     if args.detach:
         return detach(run, args)
     start(run)
+    watch(run)
     write(run.path("request.md"), request + "\n")
     if context:
         write(run.path("intake.md"), context + "\n")
@@ -809,6 +816,7 @@ def cmd_plan(args):
     if args.detach:
         return detach(run, args)
     start(run)
+    watch(run)
 
     if not source:
         write(run.path("request.md"), goal + "\n")
