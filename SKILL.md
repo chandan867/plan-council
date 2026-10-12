@@ -1,6 +1,8 @@
 ---
 name: plan-council
 description: Turn a goal, however vague ("grow this business 10x", "design the architecture for X", "plan this feature"), into a checked plan using a council of AI models. Several models frame the goal and work out the few questions worth asking the user, compete on drafts, attack the winner through different lenses, and return only the disagreements they could not settle. Works for coding, architecture, business strategy and marketing, across Claude Code, Codex, Pi and OpenCode. Use when the user states a goal or asks for a plan, a spec, a strategy, an architecture, a second opinion on a plan, or a council, debate, swarm, arena or multi-model review, and before building anything large.
+metadata:
+  opencode/slash: "true"
 ---
 
 # Plan council

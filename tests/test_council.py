@@ -15,9 +15,27 @@ class Parsing(unittest.TestCase):
         self.assertEqual(got["findings"][0]["severity"], "high")
         self.assertIsNone(council.parse_findings("no json here"))
 
-    def test_bad_findings_are_dropped_and_unknown_severity_defaults(self):
-        got = council.parse_findings(json.dumps({"findings": [{"claim": ""}, "x", {"claim": "real", "severity": "urgent"}]}))
+    def test_invalid_claims_reject_the_entire_reply(self):
+        for bad in ("x", None, {}, {"claim": ""}, {"claim": " \n "}, {"claim": 42},
+                    {"claim": True}, {"claim": ["issue"]}, {"claim": {"issue": "x"}}):
+            for findings in ([bad], [{"claim": "valid issue"}, bad]):
+                with self.subTest(findings=findings):
+                    self.assertIsNone(council.parse_findings(json.dumps({"findings": findings})))
+
+    def test_empty_findings_are_valid_and_unknown_severity_defaults(self):
+        self.assertEqual(council.parse_findings('{"findings": []}')["findings"], [])
+        got = council.parse_findings(json.dumps({"findings": [{"claim": "real", "severity": "urgent"}]}))
         self.assertEqual([f["severity"] for f in got["findings"]], ["high"])
+
+    def test_findings_limit_rejects_excess_instead_of_truncating(self):
+        findings = [{"claim": "Issue %d" % i} for i in range(council.MAX_FINDINGS_PER_HAT)]
+        self.assertEqual(len(council.parse_findings(json.dumps({"findings": findings}))["findings"]), len(findings))
+        self.assertIsNone(council.parse_findings(json.dumps({"findings": findings + [{"claim": "Extra issue"}]})))
+
+    def test_non_list_findings_are_invalid(self):
+        for findings in ({}, "issue", None, 1):
+            with self.subTest(findings=findings):
+                self.assertIsNone(council.parse_findings(json.dumps({"findings": findings})))
 
     def test_revision_needs_a_plan_block(self):
         self.assertIsNone(council.parse_revision('{"ledger": []}'))
@@ -32,6 +50,49 @@ class Parsing(unittest.TestCase):
         merged = council.merge_findings({"h1": a, "h2": b})
         self.assertEqual([(f["id"], f["severity"]) for f in merged], [("F1", "blocker"), ("F2", "low")])
         self.assertEqual(merged[0]["also_raised_by"], ["h2"])
+
+    def test_merge_keeps_similar_token_unicode_and_operator_claims_separate(self):
+        pairs = [
+            ("The plan ignores access token expiration.", "The plan ignores refresh token expiration."),
+            ("Retries use count < limit.", "Retries use count > limit."),
+            ("Validate tenant α before writing.", "Validate tenant β before writing."),
+            ("权限检查缺失", "租户检查缺失"),
+            ("/App/Token", "/app/token"),
+            ('quoted "a b" value', 'quoted "a  b" value'),
+        ]
+        for claims in pairs:
+            with self.subTest(claims=claims):
+                merged = council.merge_findings({"hat": {"critic": "one", "findings": [
+                    {"severity": "high", "claim": claim} for claim in claims]}})
+                self.assertEqual([f["claim"] for f in merged], list(claims))
+
+    def test_duplicate_retains_evidence_suggestions_severity_and_provenance(self):
+        first = {"severity": "low", "claim": "Missing tenant check.", "evidence": "api.py:10", "suggestion": "Check the API."}
+        second = {"severity": "high", "claim": "Missing tenant check", "evidence": "worker.py:20", "suggestion": "Check the worker."}
+        merged = council.merge_findings({"h1": {"critic": "one", "findings": [first]},
+                                         "h2": {"critic": "two", "findings": [second, second]}})
+        self.assertEqual(len(merged), 1)
+        f = merged[0]
+        self.assertEqual(f["severity"], "high")
+        self.assertEqual(f["also_raised_by"], ["h2"])
+        self.assertEqual(f["evidence"], "api.py:10\n\nworker.py:20")
+        self.assertEqual(f["suggestion"], "Check the API.\n\nCheck the worker.")
+        self.assertEqual(f["sources"], [dict(first, hat="h1", critic="one"), dict(second, hat="h2", critic="two"),
+                                        dict(second, hat="h2", critic="two")])
+
+    def test_unanswered_at_every_severity_needs_the_user(self):
+        for severity in council.SEVERITIES:
+            for verifier_ran in (False, True):
+                with self.subTest(severity=severity, verifier_ran=verifier_ran):
+                    f = {"severity": severity, "decision": "unanswered", "verify": "resolved"}
+                    self.assertEqual(council.needs_you([f], verifier_ran), [(f, "The planner did not answer this finding.")])
+
+    def test_only_answered_major_findings_need_independent_verification(self):
+        for severity in council.SEVERITIES:
+            with self.subTest(severity=severity):
+                f = {"severity": severity, "decision": "accept"}
+                self.assertEqual(bool(council.needs_you([f], False)), severity in ("blocker", "high"))
+                self.assertEqual(council.needs_you([f], True), [])
 
 
 class Commands(unittest.TestCase):
@@ -101,6 +162,58 @@ class EndToEnd(unittest.TestCase):
         self.assertEqual(self.ledger["gaps"], ["premortem"])
         self.assertTrue(self.has("agents/critique-premortem.retry1.out"))
         self.assertIn("premortem", council.read(os.path.join(self.run_dir, "NEEDS-YOU.md")))
+
+    def test_malformed_or_excess_findings_retry_then_report_a_gap(self):
+        for mode in ("malformed", "too-many"):
+            with self.subTest(mode=mode):
+                self.assertEqual(self.run_council(mode), 3)
+                self.assertEqual(self.ledger["gaps"], ["premortem"])
+                self.assertTrue(self.has("agents/critique-premortem.retry1.out"))
+                self.assertFalse(self.has("findings/premortem.json"))
+                self.assertIn("premortem", council.read(os.path.join(self.run_dir, "NEEDS-YOU.md")))
+
+    def test_unanswered_medium_finding_goes_to_the_human(self):
+        self.assertEqual(self.run_council("silent-medium"), 3)
+        pending = [f for f in self.ledger["findings"] if f["id"] in self.ledger["needs_you"]]
+        self.assertEqual([(f["severity"], f["decision"]) for f in pending], [("medium", "unanswered")])
+        self.assertNotIn("verify", pending[0])
+        self.assertIn("The planner did not answer", council.read(os.path.join(self.run_dir, "NEEDS-YOU.md")))
+
+    def test_similar_token_issues_both_reach_the_planner(self):
+        self.assertEqual(self.run_council("tokens"), 0)
+        self.assertEqual([f["claim"] for f in self.ledger["findings"]], [
+            "The plan ignores access token expiration.", "The plan ignores refresh token expiration."])
+        prompt = council.read(os.path.join(self.run_dir, "agents/revise.prompt.md"))
+        self.assertIn("access token expiration", prompt)
+        self.assertIn("refresh token expiration", prompt)
+
+    def test_duplicate_evidence_reaches_the_planner_and_final_ledger(self):
+        self.assertEqual(self.run_council("duplicate-evidence"), 0)
+        f = self.ledger["findings"][0]
+        self.assertEqual(f["evidence"], "codebase-reality.py:10\n\npremortem.py:10")
+        self.assertEqual(f["suggestion"], "Fix codebase-reality.\n\nFix premortem.")
+        self.assertEqual([(s["hat"], s["critic"]) for s in f["sources"]], [("codebase-reality", "one"), ("premortem", "two")])
+        for filename in ("agents/revise.prompt.md", "agents/verify.prompt.md", "ledger.md"):
+            content = council.read(os.path.join(self.run_dir, filename))
+            self.assertIn("codebase-reality.py:10", content)
+            self.assertIn("premortem.py:10", content)
+
+    def test_successful_plan_rerun_removes_stale_needs_you_from_frame_directory(self):
+        self.assertEqual(self.run_council(), 0)
+        cwd, cfg = self.tmp.name, os.path.join(self.tmp.name, "cfg.json")
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(council.main(["frame", "Add login", "--cwd", cwd, "--config", cfg]), 0)
+            run_dir = next(os.path.join(cwd, ".council", "runs", name) for name in os.listdir(os.path.join(cwd, ".council", "runs"))
+                           if os.path.exists(os.path.join(cwd, ".council", "runs", name, "brief.md")))
+            os.environ["FAKE_MODE"] = "unresolved"
+            args = ["plan", "--from", run_dir, "--cwd", cwd, "--config", cfg, "--no-arena", "--hats", "coding/codebase-reality"]
+            self.assertEqual(council.main(args), 3)
+            self.assertTrue(os.path.exists(os.path.join(run_dir, "NEEDS-YOU.md")))
+            os.environ["FAKE_MODE"] = "ok"
+            self.assertEqual(council.main(args), 0)
+        self.assertFalse(os.path.exists(os.path.join(run_dir, "NEEDS-YOU.md")))
+        ledger = json.loads(council.read(os.path.join(run_dir, "ledger.json")))
+        self.assertEqual(ledger["needs_you"], [])
 
     def test_full_depth_runs_an_arena_and_all_lenses(self):
         self.assertEqual(self.run_council(extra=["--depth", "full"]), 0)

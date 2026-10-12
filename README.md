@@ -102,7 +102,7 @@ Below that it shows each step in order with the CLI and model that did it and ho
 1 draft     the planner writes the plan. In an arena, up to three models each write one, a judge from
             another vendor scores them against the rubric, and the planner combines the best parts
 2 critique  one lens per critic, in parallel, blind to each other
-3 merge     duplicates folded, sorted by severity, numbered F1, F2 ...
+3 merge     matching claims folded without losing evidence or suggested fixes, sorted by severity, numbered F1, F2 ...
 4 revise    planner answers each finding: accept, reject or defer, and rewrites the plan
 5 verify    a different model checks how every blocker and high finding was handled
 6 you       NEEDS-YOU.md lists what the verifier disputes, what went unanswered, and lenses that failed
@@ -110,6 +110,8 @@ Below that it shows each step in order with the CLI and model that did it and ho
 ```
 
 There is one revise round and one verify round. The models do not argue back and forth: that tends to make them agree with each other, which defeats the purpose. The arena is on by default after `frame` and at full depth; `--arena` and `--no-arena` override it.
+
+Every finding needs a planner decision, including medium and low findings. Missing decisions go to `NEEDS-YOU.md`; independent verification covers blocker and high findings. Malformed critic replies are retried, then reported as a missing lens if they remain unusable. Only matching claims are merged, so similarly worded problems remain separate.
 
 ### Lenses
 

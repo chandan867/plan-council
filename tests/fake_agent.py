@@ -24,6 +24,10 @@ elif stage == "critique":
     hat = re.search(r"^HAT: (\S+)", prompt, re.M).group(1)
     if mode == "garbage" and hat == "premortem":
         print("I could not produce JSON, sorry.")
+    elif mode == "malformed" and hat == "premortem":
+        print(json.dumps({"summary": "invalid", "findings": [{"claim": ""}, "not a finding"]}))
+    elif mode == "too-many" and hat == "premortem":
+        print(json.dumps({"summary": "oversized", "findings": [{"claim": "Issue %d" % i} for i in range(8)]}))
     else:
         findings = [
             {"severity": "high", "claim": "The plan ignores the existing auth module.", "evidence": "src/auth.py:10",
@@ -31,10 +35,18 @@ elif stage == "critique":
             {"severity": "low", "claim": "Nit seen only through the %s lens." % hat, "evidence": "unverified: guess",
              "suggestion": "Tidy up.", "confidence": "low"},
         ]
+        if mode == "silent-medium":
+            findings[0]["severity"] = "medium"
+        elif mode == "tokens":
+            token = "access" if hat == "codebase-reality" else "refresh"
+            findings = [{"severity": "high", "claim": "The plan ignores %s token expiration." % token,
+                         "evidence": "%s.py:10" % token, "suggestion": "Handle expiration.", "confidence": "high"}]
+        elif mode == "duplicate-evidence":
+            findings[0].update(evidence="%s.py:10" % hat, suggestion="Fix %s." % hat)
         print('Some chatter with a stray {"x": 1} object.\n```json\n%s\n```' % json.dumps({"summary": "ok", "findings": findings}))
 elif stage == "revise":
     ids = sorted(set(re.findall(r'"id": "(F\d+)"', prompt)), key=lambda i: int(i[1:]))
-    if mode == "silent":
+    if mode in ("silent", "silent-medium"):
         ids = ids[1:]
     ledger = [{"id": i, "decision": "accept" if n == 0 else "reject", "reason": "because"} for n, i in enumerate(ids)]
     print("<<<PLAN\n# Plan v2\n\n1. Reuse auth, then build the thing.\nPLAN>>>\n<<<LEDGER\n%s\nLEDGER>>>" % json.dumps({"ledger": ledger}))

@@ -8,7 +8,6 @@ and only under <cwd>/.council/.
 """
 import argparse
 import concurrent.futures as cf
-import difflib
 import hashlib
 import json
 import os
@@ -379,10 +378,14 @@ def parse_findings(text):
     obj = extract_json(text, "findings")
     if obj is None or not isinstance(obj["findings"], list):
         return None
+    # Reject the whole reply rather than silently losing findings. ask() retries it,
+    # and reports a missing lens if the critic cannot return a valid bounded list.
+    if len(obj["findings"]) > MAX_FINDINGS_PER_HAT:
+        return None
     findings = []
     for f in obj["findings"]:
-        if not isinstance(f, dict) or not str(f.get("claim") or "").strip():
-            continue
+        if not isinstance(f, dict) or not isinstance(f.get("claim"), str) or not f["claim"].strip():
+            return None
         severity = str(f.get("severity") or "").lower()
         findings.append({
             # An unreadable severity is treated as high so the finding still gets verified.
@@ -392,7 +395,7 @@ def parse_findings(text):
             "suggestion": str(f.get("suggestion") or "").strip(),
             "confidence": str(f.get("confidence") or "medium").lower(),
         })
-    return {"summary": str(obj.get("summary") or ""), "findings": findings[:MAX_FINDINGS_PER_HAT]}
+    return {"summary": str(obj.get("summary") or ""), "findings": findings}
 
 
 def parse_revision(text):
@@ -472,23 +475,29 @@ def assign_hats(cfg, hats):
 
 
 def _norm(claim):
-    return re.sub(r"[^a-z0-9 ]+", " ", claim.lower()).strip()
+    # Keep Unicode and operators: a changed token can describe a different issue.
+    normalized = claim.strip()
+    return normalized[:-1] if normalized.endswith(".") and not normalized.endswith("..") else normalized
 
 
 def merge_findings(per_hat):
-    """Flatten per-hat findings, fold near-duplicates together, sort by severity, number them."""
+    """Fold matching claims together without losing evidence or source provenance."""
     merged = []
     for hat, result in per_hat.items():
         for f in result["findings"]:
-            twin = next((m for m in merged
-                         if difflib.SequenceMatcher(None, _norm(m["claim"]), _norm(f["claim"])).ratio() > 0.82), None)
+            source = dict(f, hat=hat, critic=result["critic"])
+            twin = next((m for m in merged if _norm(m["claim"]) == _norm(f["claim"])), None)
             if twin:
                 if hat != twin["hat"] and hat not in twin["also_raised_by"]:
                     twin["also_raised_by"].append(hat)
                 if SEVERITIES.index(f["severity"]) < SEVERITIES.index(twin["severity"]):
                     twin["severity"] = f["severity"]
+                twin["sources"].append(source)
+                for field in ("evidence", "suggestion"):
+                    values = dict.fromkeys(s.get(field, "") for s in twin["sources"] if s.get(field))
+                    twin[field] = "\n\n".join(values)
                 continue
-            merged.append(dict(f, hat=hat, critic=result["critic"], also_raised_by=[]))
+            merged.append(dict(f, hat=hat, critic=result["critic"], also_raised_by=[], sources=[source]))
     merged.sort(key=lambda f: SEVERITIES.index(f["severity"]))
     return [dict(f, id="F%d" % (i + 1)) for i, f in enumerate(merged)]
 
@@ -501,12 +510,12 @@ def needs_you(findings, verifier_ran):
     """Findings a human has to decide: (finding, why)."""
     items = []
     for f in findings:
-        if f.get("verify") == "unresolved":
+        if f["decision"] == "unanswered":
+            items.append((f, "The planner did not answer this finding."))
+        elif f.get("verify") == "unresolved":
             items.append((f, f.get("verify_note") or "The verifier disagrees with how this was handled."))
         elif not is_major(f):
             continue
-        elif f["decision"] == "unanswered":
-            items.append((f, "The planner did not answer this finding."))
         elif not verifier_ran:
             items.append((f, "Nobody independently checked the planner's answer (the verifier did not run)."))
     return items
@@ -892,6 +901,8 @@ def cmd_plan(args):
     open_points = bool(items or gaps or notes)
     if open_points:
         write(run.path("NEEDS-YOU.md"), needs_you_markdown(items, gaps, notes))
+    elif os.path.exists(run.path("NEEDS-YOU.md")):
+        os.unlink(run.path("NEEDS-YOU.md"))
     after = repo_state(cwd)
     if before is not None and after != before:
         say("WARNING: files outside .council/ changed during this run. Agents are meant to be read-only; check `git status`.")
