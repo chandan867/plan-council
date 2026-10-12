@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scores", "base", "grafts", "reason"],
+  "properties": {
+    "scores": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["candidate", "total", "notes"],
+      "properties": {"candidate": {"type": "string"}, "total": {"type": "number"}, "notes": {"type": "string"}}}},
+    "base": {"type": "string"},
+    "grafts": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["from", "what", "why"],
+      "properties": {"from": {"type": "string"}, "what": {"type": "string"}, "why": {"type": "string"}}}},
+    "reason": {"type": "string"}
+  }
+}

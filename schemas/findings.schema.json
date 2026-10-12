@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["summary", "findings"],
+  "properties": {
+    "summary": {"type": "string"},
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "claim", "evidence", "suggestion", "confidence"],
+        "properties": {
+          "severity": {"type": "string", "enum": ["blocker", "high", "medium", "low"]},
+          "claim": {"type": "string"},
+          "evidence": {"type": "string"},
+          "suggestion": {"type": "string"},
+          "confidence": {"type": "string", "enum": ["high", "medium", "low"]}
+        }
+      }
+    }
+  }
+}

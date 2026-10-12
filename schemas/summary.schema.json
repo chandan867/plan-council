@@ -1,0 +1,134 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "headline",
+    "summary",
+    "numbers",
+    "diagrams",
+    "steps",
+    "decisions",
+    "risks",
+    "open_questions"
+  ],
+  "properties": {
+    "headline": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "numbers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label",
+          "value"
+        ],
+        "properties": {
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "diagrams": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "caption",
+          "mermaid"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "caption": {
+            "type": "string"
+          },
+          "mermaid": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "what",
+          "done_when"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "what": {
+            "type": "string"
+          },
+          "done_when": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "decision",
+          "why"
+        ],
+        "properties": {
+          "decision": {
+            "type": "string"
+          },
+          "why": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "risk",
+          "handling"
+        ],
+        "properties": {
+          "risk": {
+            "type": "string"
+          },
+          "handling": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "open_questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["checks"],
+  "properties": {
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "note"],
+        "properties": {
+          "id": {"type": "string"},
+          "status": {"type": "string", "enum": ["resolved", "unresolved"]},
+          "note": {"type": "string"}
+        }
+      }
+    }
+  }
+}
